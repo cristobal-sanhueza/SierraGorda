@@ -1,6 +1,6 @@
 ---
 title: "Asertividad del Modelo de Pronóstico de MP10 para Minera Sierra Gorda"
-date: "Enero 2023"
+date: "Mayo 2023"
 geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
 output: pdf_document
 header-includes:
@@ -21,15 +21,14 @@ header-includes:
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
 
-MesDelReporte = "enero"
+MesDelReporte = "mayo"
   
-FechaEntrega = "Febrero 2023"
+FechaEntrega = "Junio 2023"
   
-setwd("/Users/cristobal512/Desktop/geoaire/GeoaireProject/GeoAire")
+setwd("/Users/cristobal512/Desktop/geoaire")
 library(openair)
 library(pander)
 library(tidyverse)
-library(reshape2)
 library(dygraphs)
 library(xts)
 library(readxl)
@@ -44,19 +43,16 @@ library(lubridate)
 
 # MP10 MOD #
 
-MP10_Modelados <- list.files(path = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2023/1.Enero/MP10/Nuevos",
+MP10_Modelados <- list.files(path = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2023/5.Mayo/MP10",
                                pattern = "*.xlsx",
                                full.names = TRUE) %>%
   lapply(read_excel)
 
-for (i in 1:31) {
+for (i in 1:length(MP10_Modelados)) {
   MP10_Modelados[[i]] <- MP10_Modelados[[i]][1:24,]
 }
 
 MP10_Modelados <-  bind_rows(MP10_Modelados)
-
-MP10_Modelados <- MP10_Modelados %>% 
-  mutate(hora = hour(FECHA))
 
 MeanMP10byHour_Modelados <- MP10_Modelados %>% 
   select(hora, VALOR) %>% 
@@ -65,7 +61,7 @@ MeanMP10byHour_Modelados <- MP10_Modelados %>%
 
 #MP10 OBS #
 
-MP10_Observados <- read_excel("SIERRA_GORDA/Observados/2023/1.Enero/MP10/Consultas en Linea.xlsx")
+MP10_Observados <- read_excel("SIERRA_GORDA/Observados/2023/5.Mayo/MP10/Consultas en Linea.xlsx")
 
 MP10_Observados <- MP10_Observados %>% 
   mutate(MP_10 = as.numeric(MP_10))
@@ -78,12 +74,12 @@ MeanMP10byHour_Observados <- MP10_Observados %>%
 
 # MET MOD #
 
-Met_Modelados <- list.files(path = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2023/1.Enero/Meteorologia",    
+Met_Modelados <- list.files(path = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2023/5.Mayo/Meteorologia",    
                             pattern = "*.xlsx",
                             full.names = TRUE) %>% 
   lapply(read_excel) 
 
-for (i in 1:31) {
+for (i in 1:length(Met_Modelados)) {
   Met_Modelados[[i]] <- Met_Modelados[[i]][1:24,c(1,6:8)]
 }
 
@@ -91,7 +87,7 @@ Met_Modelados <-  bind_rows(Met_Modelados)
 
 # MET OBS #
 
-Met_Observados <- read_excel("SIERRA_GORDA/Observados/2023/1.Enero/Meteorologia/Consultas en Linea.xlsx")
+Met_Observados <- read_excel("SIERRA_GORDA/Observados/2023/5.Mayo/Meteorologia/Consultas en Linea.xlsx")
 
 Met_Observados <- Met_Observados %>% 
   mutate(DateAndTime = as.POSIXct(paste(Fecha, Hora), format = "%d/%m/%Y %H"),
@@ -128,9 +124,9 @@ Para:
 ```{r, message = FALSE, echo = FALSE}
 
 df <- data.frame(`Nº Proyecto` = c("G12-21"),
-                 Elaboración = c("CSD 06-02-23"),
-                 `Revisión A` = c("MTV 06-02-23"),
-                 Aprobó = c("PSH 06-02-23"),
+                 Elaboración = c("CSD 08-06-23"),
+                 `Revisión A` = c("MTV 08-06-23"),
+                 Aprobó = c("PSH 08-06-23"),
                  Versión = "V1")
 
 #colnames(df) <- c("Nivel", "Concentración de MP10[µg/m3]", "Descripción")
@@ -190,7 +186,7 @@ GEOMET es una aplicación web, con claves, el cual despliega el pronóstico de M
 
 ## 1.1	OBJETIVO
 
-El objetivo de este informe es evaluar el desempeño del modelo de pronóstico de meteorología y MP10 para Sierra Gorda. Para esto se comparan los valores medidos (observados) en la estación monitora de Sierra Gorda, con los valores pronosticados por el modelo, usando como rangos de validación los niveles 0 µg/m3 a 100 µg/m3 (Bueno), 100 µg/m3 a 150 µg/m3 (Regular o Alerta 1), y sobre 150 µg/m3 (Malo o Alerta 2).
+El objetivo de este informe es evaluar el desempeño del modelo de pronóstico de meteorología y MP10 para Sierra Gorda. Para esto se comparan los valores medidos (observados) en la estación monitora de Sierra Gorda, con los valores pronosticados por el modelo, usando como rangos de validación los niveles 0 µg/m3 a 130 µg/m3 (Bueno), 130 µg/m3 a 180 µg/m3 (Regular o Alerta 1), y sobre 180 µg/m3 (Malo o Alerta 2).
 
 \newpage
 
@@ -211,7 +207,7 @@ Es así como los niveles de interés para la gestión del MP10 son las que se in
 ```{r, message = FALSE, echo = FALSE}
 
 df <- data.frame(Nivel = c("Bueno", "Alerta1", "Alerta2"),
-                 `Concentración de MP10[µg/m3]` = c("0 - 100", "100 - 150", "> 150"),
+                 `Concentración de MP10[µg/m3]` = c("0 - 130", "130 - 180", "> 180"),
                  Descripción = c("Sin riesgo para la salud", "Nivel preventivo", "Limite norma primaria MP10"))
 
 colnames(df) <- c("Nivel", "Concentración de MP10[µg/m3]", "Descripción")
@@ -244,10 +240,10 @@ La Figura 3.1 muestra la serie de tiempo de la Temperatura ambiental (ºC) medid
 Temperatura <- Met_Observados[,c(1,4)] %>% 
   mutate(TEMP_MOD = Met_Modelados$TEMP)
 
-Temperatura <- melt(Temperatura, id = c("DateAndTime"))
+Temperatura <- pivot_longer(Temperatura, cols = c("TEMP", "TEMP_MOD"))
 
 Temperatura %>%
-  ggplot(aes(x = DateAndTime, y = value, color = variable)) +
+  ggplot(aes(x = DateAndTime, y = value, color = name)) +
   geom_line() +
   theme_bw() +
   theme(legend.position = "top", legend.title = element_blank(), axis.text.x = element_text(angle = 30, hjust = 1)) +
@@ -308,10 +304,10 @@ La Figura 3.2 muestra la serie de tiempo de la Velocidad del viento (m/s) medida
 Velocidad <- Met_Observados[,c(1,3)] %>% 
   mutate(VEL_MOD = Met_Modelados$WSPEED)
 
-Velocidad <- melt(Velocidad, id = c("DateAndTime"))
+Velocidad <- pivot_longer(Velocidad, cols = c("VEL","VEL_MOD"))
 
 Velocidad %>%
-  ggplot(aes(x = DateAndTime, y = value, color = variable)) +
+  ggplot(aes(x = DateAndTime, y = value, color = name)) +
   geom_line() +
   theme_bw() +
   theme(legend.position = "top", legend.title = element_blank(), axis.text.x = element_text(angle = 30, hjust = 1)) +
@@ -472,7 +468,7 @@ MFE: Error fraccional medio
 
 ## 3.2	EVALUACIÓN DEL PRONÓSTICO DE MP10
 
-La Figura 3.7 muestra el ciclo horario de las concentraciones de MP10 (µg/m3) medida y modelada en la estación Sierra Gorda para el mes de `r MesDelReporte` del 2023. De ella se observa que el modelo de pronóstico logra reproducir el ciclo diario del MP10 en Sierra Gorda.
+La Figura 3.7 muestra el ciclo horario de las concentraciones de MP10 (µg/m3) medida y modelada en la estación Sierra Gorda para el mes de `r MesDelReporte` del 2023. A pesar de que el modelo logra captar el ciclo y tendencia de los niveles de MP10, los valores en la mayoría de las horas está subestimada. Cabe destacar que ésto no se había notado en meses anteriores por lo tanto vemos que las condiciones de las fuentes han cambiado. Se recalculará el modelo para los próximos meses.
 
 \hfill\break
 
@@ -483,10 +479,10 @@ La Figura 3.7 muestra el ciclo horario de las concentraciones de MP10 (µg/m3) m
 MP10 <- MeanMP10byHour_Observados %>% 
   mutate(MP_10_MOD = MeanMP10byHour_Modelados$VALOR)
 
-MP10 <- melt(MP10, id = c("Hora"))
+MP10 <- pivot_longer(MP10, cols = c("MP_10", "MP_10_MOD"))
 
 MP10 %>% 
-  ggplot(aes(x = Hora, y = value, color = variable)) +
+  ggplot(aes(x = Hora, y = value, color = name)) +
   geom_line() +
   theme_bw() +
   labs(x = "Hora del día", y = "MP10 (µg/m3N)") +
@@ -536,11 +532,11 @@ FechayValor_MP10Mod <- MP10_Modelados %>%
 
 ExactitudMP10 <- FechayValor_MP10Obs %>% 
   mutate(MP_10_MOD = FechayValor_MP10Mod$VALOR,
-         Bueno = case_when((between(MP_10, 0, 100) & between(MP_10_MOD, 0, 100)) | (!between(MP_10, 0, 100) & (!between(MP_10_MOD, 0, 100))) ~ 1,
+         Bueno = case_when((between(MP_10, 0, 130) & between(MP_10_MOD, 0, 130)) | (!between(MP_10, 0, 130) & (!between(MP_10_MOD, 0, 130))) ~ 1,
                            TRUE ~ 0),
-         Alerta1 = case_when((between(MP_10, 100, 150) & between(MP_10_MOD, 100, 150)) | (!between(MP_10, 100, 150) & (!between(MP_10_MOD, 100, 150))) ~ 1,
+         Alerta1 = case_when((between(MP_10, 130, 180) & between(MP_10_MOD, 130, 180)) | (!between(MP_10, 130, 180) & (!between(MP_10_MOD, 130, 180))) ~ 1,
                              TRUE ~ 0),
-         Alerta2 = case_when((MP_10 > 150 & MP_10_MOD > 150) | (MP_10 < 150 & MP_10_MOD < 150) ~ 1,
+         Alerta2 = case_when((MP_10 > 180 & MP_10_MOD > 180) | (MP_10 < 180 & MP_10_MOD < 180) ~ 1,
                              TRUE ~ 0))
 
 pct_bueno = sum(ExactitudMP10$Bueno, na.rm = TRUE) / nrow(ExactitudMP10)

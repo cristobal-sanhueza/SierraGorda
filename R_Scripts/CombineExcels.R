@@ -1,5 +1,5 @@
-library("dplyr")                                                
-library("readr")  
+library("dplyr")                                           
+library("readr")
 library("readxl")
 library("xlsx")
 
@@ -7,7 +7,7 @@ library("xlsx")
 
 ### DATAFRAME MODELADOS
 
-Modelados <- list.files(path = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2022/12.Diciembre/Meteorologia",    
+Modelados <- list.files(path = "Modelados/pronostico-alerta/sg/2023/5.Mayo/MP10",    
                         pattern = "*.xlsx",
                         full.names = TRUE) %>% 
   lapply(read_excel) %>% 
@@ -18,7 +18,7 @@ View(Modelados)
 
 ####################################################################################################################################
 
-NumberOfDaysInMonth = 31
+NumberOfDaysInMonth = 22
 
 MyLogicVector <- rep(c(T,F,F), NumberOfDaysInMonth) # T,F,F    T,F,F    T,F,F   ... 31 times (93 items)
 
@@ -36,7 +36,7 @@ View(Modelados)
 ####################################################################################################################################
 
 
-write.xlsx(Modelados, file = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2022/12.Diciembre/Meteorologia/Combinados/Diciembre2022.xlsx")
+write.xlsx(Modelados, file = "Modelados/pronostico-alerta/sg/2023/5.Mayo/MP10/Combinados/Mayo2023.xlsx")
 
 
 write_excel_csv(Modelados, file = "SIERRA_GORDA/Modelados/pronostico-alerta/sg/2022/12.Diciembre/MP10/Combinados/Julio2022.csv")
