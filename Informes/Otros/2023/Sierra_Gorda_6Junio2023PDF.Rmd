@@ -92,7 +92,8 @@ Met_Observados <- read_excel("SIERRA_GORDA/Observados/2023/6.Junio/Meteorologia/
 Met_Observados <- Met_Observados %>% 
   mutate(DateAndTime = as.POSIXct(paste(Fecha, Hora), format = "%d/%m/%Y %H"),
          DIR = as.numeric(DIR),
-         VEL = as.numeric(VEL)) %>% 
+         VEL = as.numeric(VEL),
+         TEMP = as.numeric(TEMP)) %>% 
   select(DateAndTime, DIR, VEL, TEMP)
 
 
@@ -441,7 +442,7 @@ El análisis estadístico de la dirección del viento observada y medida en la e
 
 **Tabla III.3: Análisis estadístico de la dirección del viento en la estación Sierra Gorda**
 
-```{r, message = FALSE, echo = FALSE}
+```{r, message = FALSE, echo = FALSE, warning=FALSE}
 
 MFError = round(200 * mean(abs(Met_Modelados$wd - Met_Observados$wd) / (Met_Modelados$wd + Met_Observados$wd), na.rm = TRUE), 2)
 
@@ -496,7 +497,6 @@ MP10 %>%
 
 \justifying
 
-\hfill\break
 
 El análisis estadístico de las concentraciones de MP10 observados y medidos en la estación Sierra Gorda se muestra en la tabla III.4. De ella se observa que el modelo presenta un buen desempeño debido a que los estadígrafos se encuentran dentro de los rangos aceptables.
 
