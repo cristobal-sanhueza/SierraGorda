@@ -436,7 +436,7 @@ hist2d(HoraYdireccion_Mod, nbins = 25, col = r, xlab = "Horas del día", ylab = 
 
 \justifying
 
-El análisis estadístico de la dirección del viento observada y medida en la estación Sierra Gorda se muestra en la Tabla III.3. De ella se observa que el modelo presenta un buen ajuste debido a que los estadígrafos están dentro de los rangos aceptables.
+El análisis estadístico de la dirección del viento observada y medida en la estación Sierra Gorda se muestra en la Tabla III.3. De ella se observa un buen MFB y un MFE levemente fuera del rango. En general el modelo presenta un buen desempeño.
 
 \centering
 
@@ -498,7 +498,7 @@ MP10 %>%
 \justifying
 
 
-El análisis estadístico de las concentraciones de MP10 observados y medidos en la estación Sierra Gorda se muestra en la tabla III.4. De ella se observa que el modelo presenta un buen desempeño debido a que los estadígrafos se encuentran dentro de los rangos aceptables.
+El análisis estadístico de las concentraciones de MP10 observados y medidos en la estación Sierra Gorda se muestra en la tabla III.4. De ella se observa que el modelo presenta un buen desempeño debido a que el MFE se encuentra dentro de los rangos aceptables y el MFB levemente fuera del rango.
 
 \centering
 
