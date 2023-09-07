@@ -13,8 +13,8 @@ from selenium.webdriver.chrome.options import Options
 
 # %%
 # SET DATES DESIRED
-FechaInicio = '20/06/2023'
-FechaFinal = '20/07/2023'
+FechaInicio = '20/07/2023'
+FechaFinal = '20/08/2023'
 
 # %%
 # INITIALIZE DRIVER
@@ -199,7 +199,7 @@ latest_file = max([os.path.join(download_folder, f) for f in os.listdir(download
 destination_folder = '/Users/cristobal512/Desktop/JupyterLab/../geoaire/SIERRA_GORDA/Observados/ScrapedGeologger'
 
 shutil.move(latest_file, destination_folder)
-time.sleep(2)
+time.sleep(5)
 
 # %%
 # CALCULOS PCTJE DE ACIERTOS
@@ -257,5 +257,8 @@ print(f'Porcentaje Alerta2: {pct_alerta2}')
 print(f'Porcentaje Promedio: {promedio}')
 
 
+
+# %%
+driver.quit()
 
 # %%
