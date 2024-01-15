@@ -1,0 +1,1035 @@
+---
+title: "Asertividad del Modelo de Pronóstico de MP10 para Minera Sierra Gorda"
+author: "Cristobal Sanhueza"
+output: html_document
+---
+
+```{r load_libraries, include=FALSE}
+library(openair)
+library(pander)
+library(tidyverse)
+library(dygraphs)
+library(xts)
+library(readxl)
+library(RColorBrewer)
+library(data.table)
+library(gplots)
+library(scales)
+library(hydroGOF)
+library(cvms)
+library(lubridate)
+library(stringr)
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+Periodo = "segundo semestre del 2023"
+  
+start_date <- '01-07-2023'
+end_date <- '31-12-2023'
+
+# Create a lookup vector for Spanish month names
+spanish_months <- c("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", 
+                    "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre")
+
+fecha_comienzo <- as.Date(start_date, format='%d-%m-%Y')
+fecha_comienzo_dia <- format(fecha_comienzo, format = "%d")
+fecha_comienzo_mes <- format(fecha_comienzo, format = "%m")
+fecha_comienzo_mes_nombre <- spanish_months[as.numeric(fecha_comienzo_mes)]
+
+fecha_termino <- as.Date(end_date, format='%d-%m-%Y')
+fecha_termino_dia <- format(fecha_termino, format = "%d")
+fecha_termino_mes <- format(fecha_termino, format = "%m")
+fecha_termino_year <- format(fecha_termino, format = "%Y")
+
+
+
+# Use the month number to get the Spanish month name
+fecha_termino_mes_nombre <- spanish_months[as.numeric(fecha_termino_mes)]
+
+fecha_entrega <- fecha_termino %m+% months(1)
+Mes_de_entrega <- format(fecha_entrega, format = "%m")
+Year_de_entrega <- format(fecha_entrega, format = "%Y")
+
+Mes_de_entrega_nombre <- spanish_months[as.numeric(Mes_de_entrega)]
+
+# Fecha para ELABORACION, REVISION, APROBACION
+first_day_next_month <- floor_date(fecha_termino %m+% months(1), "month")
+first_day_next_month_weekday <- wday(first_day_next_month, week_start = getOption("lubridate.week.start", 1))
+
+if(first_day_next_month_weekday > 5) {
+    first_day_next_month <- first_day_next_month + (8 - first_day_next_month_weekday)
+}
+
+Primer_dia_habil_sgte_mes <- format(first_day_next_month, format='%d-%m-%Y')
+
+```
+
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+
+#MP10 MOD #
+
+path_mp10_mod <- paste0('/Users/cristobal512/Desktop/geoaire/SIERRA_GORDA/Modelados/Geologger/calidad-aire-dia-hora_Sierra_Gorda-PRO_', start_date, '_a_', end_date, '.csv')
+
+MP10_Modelados <- read_csv(path_mp10_mod, col_types = cols(Fecha = col_date(format = "%d/%m/%Y")))
+
+MP10_Modelados <- MP10_Modelados %>% 
+  rename(MP10_Mod = `MP10 (µg/m³N)`)
+
+MP10_Modelados <- MP10_Modelados %>%
+  mutate(Fecha = ymd_h(paste(Fecha, Hora)))
+
+MeanMP10byHour_Modelados <- MP10_Modelados %>% 
+  select(Hora, MP10_Mod) %>% 
+  group_by(Hora) %>% 
+  summarise(MP10_Mod = mean(MP10_Mod, na.rm = TRUE))
+
+
+#MP10 OBS #
+
+path_mp10_obs <- paste0('/Users/cristobal512/Desktop/geoaire/SIERRA_GORDA/Observados/Geologger/calidad-aire-dia-hora_Sierra_Gorda_', start_date, '_a_', end_date, '.csv')
+
+MP10_Observados <- read_csv(path_mp10_obs, col_types = cols(Fecha = col_date(format = "%d/%m/%Y")))
+
+MP10_Observados <- MP10_Observados %>% 
+  rename(MP10_Obs = `MP10 (µg/m³N)`)
+
+MP10_Observados <- MP10_Observados %>%
+  mutate(Fecha = ymd_h(paste(Fecha, Hora)))
+
+MeanMP10byHour_Observados <- MP10_Observados %>% 
+  select(Hora, MP10_Obs) %>% 
+  group_by(Hora) %>% 
+  summarise(MP10_Obs = mean(MP10_Obs, na.rm = TRUE))
+
+# MET MOD #
+
+path_met_mod <- paste0('/Users/cristobal512/Desktop/geoaire/SIERRA_GORDA/Modelados/Geologger/Sierra_Gorda-PRO_', start_date, '_a_', end_date, '.csv')
+
+Met_Modelados <- read_csv(path_met_mod,
+                          col_types = cols(Fecha = col_date(format = "%d/%m/%Y")),
+                          locale = locale(decimal_mark = ","))
+
+Met_Modelados <- Met_Modelados %>% 
+  rename(date = Fecha,
+         wd = `Direccion viento (°)`,
+         ws = `Velocidad del viento (m/s)`,
+         t = `Temperatura (°C)`)
+
+Met_Modelados <- Met_Modelados %>%
+  mutate(date = ymd_h(paste(date, Hora)))
+
+# MET OBS #
+
+path_met_obs <- paste0('/Users/cristobal512/Desktop/geoaire/SIERRA_GORDA/Observados/Geologger/Sierra_Gorda_', start_date, '_a_', end_date, '.csv')
+
+Met_Observados <- read_csv(path_met_obs, col_types = cols(Fecha = col_date(format = "%d/%m/%Y")), locale = locale(decimal_mark = ","))
+
+Met_Observados <- Met_Observados %>% 
+  rename(date = Fecha,
+         wd = `Direccion viento (°)`,
+         ws = `Velocidad del viento (m/s)`,
+         t = `Temperatura (°C)`)
+
+Met_Observados <- Met_Observados %>%
+  mutate(date = ymd_h(paste(date, Hora)))
+
+
+```
+
+<style>
+  /* Center the title */
+  h1.title {
+    text-align: center;
+  }
+
+  /* Hide the author and date */
+  .author, .date {
+    display: none;
+  }
+</style>
+
+<style>
+  /* Center the table */
+  .centered-table {
+    margin: 0 auto;
+  }
+</style>
+
+<style>
+  .justified-text {
+    text-align: justify;
+  }
+</style>
+
+<style>
+  .centered-text {
+    text-align: center;
+  }
+</style>
+
+<style>
+  .centered-images {
+    display: flex;
+    justify-content: center;
+  }
+  .centered-images img {
+    width: 400px;
+    height: 300px;
+    object-fit: cover;
+    margin: 5px;
+  }
+</style>
+
+
+# {.tabset .tabset-fade .tabset-pills}
+
+## Introducción
+
+<div class="centered-text">
+  <h3>Evaluación del Modelo de Pronóstico de MP10 de Sierra Gorda</h3>
+</div>
+
+<br>
+
+<div class="centered-text">
+  <p><b><u>desde `r fecha_comienzo_dia` de `r fecha_comienzo_mes_nombre` al `r fecha_termino_dia` de `r fecha_termino_mes_nombre` `r fecha_termino_year`</u></b></p>
+</div>
+
+
+<br>
+
+<div class="centered-images">
+  <figure>
+    <img src="Imagenes/Truck.jpg" alt="Image 1">
+  </figure>
+  <figure>
+    <img src="Imagenes/Geomet.jpeg" alt="Image 2">
+  </figure>
+</div>
+
+<div style="display: flex; justify-content: center;">
+  <figure>
+    <img src="Imagenes/Geologger.jpeg" alt="Image 3" width="400" height="300">
+  </figure>
+</div>
+
+
+<br>
+
+<div class="centered-text">
+  <p>Elaborado por:
+
+**GEOAIRE AMBIENTAL SpA**
+
+Para:
+
+**Compañía Minera Sierra Gorda**
+
+`r Mes_de_entrega_nombre` `r Year_de_entrega`</p>
+</div>
+
+<br>
+
+```{r, message = FALSE, echo = FALSE}
+
+df <- data.frame(`Nº Proyecto` = c("G12-21"),
+                 Elaboración = paste('ESM', '08-01-2024'),
+                 Revisión = paste('MTV', '08-01-2024'),
+                 Aprobó = paste('PSH', '08-01-2024'),
+                 Versión = "V1")
+
+#colnames(df) <- c("Nivel", "Concentración de MP10[µg/m3]", "Descripción")
+
+pander(df, justify = c("center"))
+```
+
+<br>
+
+**ESTUDIO DESARROLLADO POR:**
+
+<div style="display: flex; justify-content: space-between;">
+  <div>Dr. Ing. Pedro Sanhueza H.</div>
+  <div>Jefe de Proyecto</div>
+</div>
+<div style="display: flex; justify-content: space-between;">
+  <div>Mónica Torreblanca V.</div>
+  <div>Ingeniero Ambiental</div>
+</div>
+<div style="display: flex; justify-content: space-between;">
+  <div>Evelyn Salazar M.</div>
+  <div>Ingeniero Geografo</div>
+</div>
+
+<br>
+
+**CONTRAPARTE TÉCNICA:**
+
+<div style="display: flex; justify-content: space-between;">
+  <div>Francisco Vega T.   </div>
+  <div>Ingeniero de Medio Ambiente SGSCM</div>
+</div>
+
+<br>
+
+### 1	INTRODUCCIÓN
+
+<div class="justified-text">
+
+<p>La Compañía Minera Sierra Gorda, a través de sus actividades de extracción y procesamiento de mineral genera emisiones de material particulado respirable (MP10), el cual se transporta y dispersa según las condiciones meteorológicas imperantes, generando en algunas ocasiones, altos niveles de MP10, el cual se registra en su estación monitora, denominada Sierra Gorda, ubicada en la localidad del mismo nombre.
+
+Minera Sierra Gorda posee un compromiso contenido en su Resolución de Calificación Ambiental (RCA), que consiste en generar un Plan de Contingencia que permita predecir eventos adversos por contaminación atmosférica. Estos eventos pueden ser condiciones de viento, estabilidad atmosférica, etc., que generen poca ventilación, y por tanto, ser capaces de gatillar contingencias por altas concentraciones de contaminantes. El requerimiento de la RCA indica además, que se debe incluir un sistema de pronóstico en línea, y que permita la detección oportuna de eventos de alerta por MP10. Todo lo anterior, se sustenta en un modelo de pronóstico meteorológico, que permita anticipar eventos de altas concentraciones de MP10, debido a condiciones meteorológicas adversas para la dispersión.
+
+Sierra Gorda posee un Plan de Gestión de Calidad del Aire, el cual tiene por objetivo velar por el cumplimiento de la normativa vigente de calidad del aire por parte de la operación. Los niveles de riesgo definidos por la operación corresponden a concentraciones de MP10 sobre 50 µg/m3 y sobre 65 µg/m3. Cuando se llegan a esos umbrales, se activa un plan de acción predefinido.
+
+Para anticiparse a eventos adversos de concentraciones de MP10, que pongan en riesgo la salud de sus trabajadores y su entorno, Sierra Gorda dispone de un Sistema de Pronóstico meteorológico y de MP10, el cual se compone de un sistema de Alerta y un Plan de Contingencia, que permite actuar con antelación, cuando las condiciones meteorológicas unidas a la operación, puedan poner en riesgo a la comunidad.
+
+El sistema de Pronóstico se denomina GEOMET, el cual contiene módulos de Pronóstico Meteorológico, Alertas por MP10, Plan de Contingencia, Análisis de trayectorias, y Simulación de Plumas de tronadura. Todas estas herramientas ayudan a la operación en la toma de decisión que minimiza los efectos adversos por MP10.
+
+GEOMET es una aplicación web, con claves, el cual despliega el pronóstico de MP10 y además envía reportes automáticos todos los días a las 08:00 AM, a un grupo de usuarios que requieren conocer el pronóstico de la meteorología y MP10 en Sierra Gorda.<p>
+
+</div>
+
+
+### 1.1	OBJETIVO
+
+<div class="justified-text">
+
+<p>El objetivo de este informe es evaluar el desempeño del modelo de pronóstico de meteorología y MP10 para Sierra Gorda. Para esto se comparan los valores medidos (observados) en la estación monitora de Sierra Gorda, con los valores pronosticados por el modelo, usando como rangos de validación los niveles 0 µg/m3 a 130 µg/m3 (Bueno), 130 µg/m3 a 180 µg/m3 (Regular o Alerta 1), y sobre 180 µg/m3 (Malo o Alerta 2).<p>
+
+</div>
+
+
+
+## Medidas de Desempeño del Modelo de Pronóstico
+
+### Medidas de Desempeño del Modelo de Pronóstico
+
+Para evaluar el desempeño del pronóstico de MP10, se utilizan bandas o rangos de valores, de acuerdo a los niveles donde se toman medidas de gestión de calidad del aire, es decir, en los niveles Alerta 1 y Alerta 2.
+
+Es así como los niveles de interés para la gestión del MP10 son las que se indican en la Tabla II.1.
+
+<br>
+
+<div class="centered-text">
+  <p>**Tabla II.1: Niveles de Interés**</p>
+</div>
+
+<center>
+
+```{r, message = FALSE, echo = FALSE}
+
+df <- data.frame(Nivel = c("Bueno", "Alerta1", "Alerta2"),
+                 `Concentración de MP10[µg/m3]` = c("0 - 130", "130 - 180", "> 180"),
+                 Descripción = c("Sin riesgo para la salud", "Nivel preventivo", "Limite norma primaria MP10"))
+
+colnames(df) <- c("Nivel", "Concentración de MP10[µg/m3]", "Descripción")
+
+pander(df, justify = c("center", "center", "left"))
+
+```
+
+</center>
+
+<br>
+
+Se considera un acierto, si el pronóstico y la medición de las concentraciones de MP10 están en el mismo nivel.
+
+Estadísticamente, el acierto se estima a través de la Exactitud, la cual se define como el porcentaje de veces que el pronóstico del modelo coincide con lo observado, respecto al total de pronósticos realizados.
+
+
+## Evaluación del Desempeño
+
+### EVALUACIÓN DEL DESEMPEÑO
+
+Para evaluar el desempeño del modelo de pronóstico, se dispone de la base de datos para el periodo del `r Periodo`, de las concentraciones de MP10 medidas en la estación Sierra Gorda, la cual se compara con las concentraciones de MP10 pronosticadas por **GEOMET** para igual período.
+
+<br>
+
+#### 3.1	EVALUACIÓN DEL PRONÓSTICO METEOROLÓGICO
+
+
+La Figura 3.1 muestra la serie de tiempo de la Temperatura ambiental (ºC) medida y modelada en la estación Sierra Gorda. De ella se observa que el modelo de pronóstico meteorológico logra reproducir satisfactoriamente el ciclo diario y la tendencia de la temperatura en la estación Sierra Gorda, el modelo en general subestima en un par de grados la temperatura.
+
+<div style="text-align: center;">
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+
+Temperatura <- inner_join(Met_Observados[c('date', 't')], Met_Modelados[c('date', 't')], by = "date")
+
+Temperatura_longer <- pivot_longer(Temperatura, cols = c("t.x", "t.y"))
+
+Temperatura_longer$name <- factor(Temperatura_longer$name, levels = c("t.y", "t.x"))
+
+Temperatura_longer %>%
+  ggplot(aes(x = date, y = value, color = name)) +
+  geom_line() +
+  theme_bw() +
+  theme(legend.position = "top", legend.title = element_blank(), axis.text.x = element_text(angle = 30, hjust = 1)) +
+  labs(x = "", y = "Temperatura (°C)") +
+  scale_color_discrete(labels = c("Modelado", "Observado")) +
+  scale_x_datetime(date_labels = "%d %b", date_breaks = "8 day")
+
+```
+
+</div>
+
+<div class="centered-text">
+  <p>**Figura 3.1: Serie de tiempo de la Temperatura medida y modelada de la estación Sierra Gorda**</p>
+</div>
+
+<br>
+
+El análisis estadístico de la temperatura observada y medida en la estación Sierra Gorda es el siguiente. De ella se observa que existe un buen ajuste del modelo.
+
+<br>
+
+<div class="centered-text">
+  <p>**Tabla III.1: Análisis estadístico de la temperatura en la estación Sierra Gorda**</p>
+</div>
+
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+
+MFError = round(200 * mean(abs(Temperatura$t.y - Temperatura$t.x) / (Temperatura$t.y + Temperatura$t.x), na.rm = TRUE), 2)
+
+MFBias <- round(200 * mean((Temperatura$t.y - Temperatura$t.x) / (Temperatura$t.y + Temperatura$t.x), na.rm = TRUE), 2)
+
+IOAgreement = round(md(Temperatura$t.y, Temperatura$t.x), 2)
+
+df <- data.frame(IOA = "1,0",
+                 `Criterio IOA` = "> 0,8",
+                 MFE = MFError,
+                 `Criterio MFE` = "<+/- 70,0",
+                 MFB = MFBias,
+                 `Criterio MFB` = "<+/- 60,0")
+
+colnames(df) <- c("IOA", "Criterio IOA", "MFE", "Criterio MFE", "MFB", "Criterio MFB")
+
+pander(df, justify = "center")
+```
+
+MFB: Sesgo fraccional  
+MFE: Error fraccional medio  
+IOA: Índice de acuerdo (Index of Agreement)
+
+<br>
+
+La Figura 3.2 muestra la serie de tiempo de la Velocidad del viento (m/s) medida y modelada en la estación Sierra Gorda. De ella se observa que el modelo de pronóstico meteorológico logra reproducir satisfactoriamente el ciclo diario y la tendencia de la velocidad del viento.
+
+<div style="text-align: center;">
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+
+Velocidad <- inner_join(Met_Observados[c('date', 'ws')], Met_Modelados[c('date', 'ws')], by = "date")
+
+Velocidad_longer <- pivot_longer(Velocidad, cols = c("ws.x", "ws.y"))
+
+Velocidad_longer$name <- factor(Velocidad_longer$name, levels = c("ws.y", "ws.x"))
+
+Velocidad_longer %>%
+  ggplot(aes(x = date, y = value, color = name)) +
+  geom_line() +
+  theme_bw() +
+  theme(legend.position = "top", legend.title = element_blank(), axis.text.x = element_text(angle = 30, hjust = 1)) +
+  labs(x = "", y = "Velocidad de Viento (m/s)") +
+  scale_color_discrete(labels = c("Modelado", "Observado")) +
+  scale_x_datetime(date_labels = "%d %b", date_breaks = "8 day")
+
+```
+
+**Figura 3.2: Serie de tiempo de la Velocidad del viento medida y modelada de la estación Sierra Gorda**
+
+</div>
+
+<br>
+
+El análisis estadístico de la velocidad del viento observada y medida en la estación Sierra Gorda se muestra en la Tabla III.2. De ella se observa que existe un buen ajuste del modelo.
+
+<br>
+
+<div style="text-align: center;">
+
+**Tabla III.2: Análisis estadístico de la velocidad del viento en la estación Sierra Gorda**
+
+```{r, message = FALSE, echo = FALSE, warning=FALSE}
+
+MFError = round(200 * mean(abs(Velocidad$ws.y - Velocidad$ws.x) / (Velocidad$ws.y + Velocidad$ws.x), na.rm = TRUE), 2)
+
+MFBias <- round(200 * mean((Velocidad$ws.y - Velocidad$ws.x) / (Velocidad$ws.y + Velocidad$ws.x), na.rm = TRUE), 2)
+
+IOAgreement = round(md(Velocidad$ws.y, Velocidad$ws.x), 2)
+
+df <- data.frame(IOA = "1,0",
+                 `Criterio IOA` = "> 0,8",
+                 MFE = MFError,
+                 `Criterio MFE` = "<+/- 70,0",
+                 MFB = MFBias,
+                 `Criterio MFB` = "<+/- 60,0")
+
+colnames(df) <- c("IOA", "Criterio IOA", "MFE", "Criterio MFE", "MFB", "Criterio MFB")
+
+pander(df, justify = "center")
+```
+
+</div>
+
+MFB: Sesgo fraccional  
+MFE: Error fraccional medio  
+IOA: Índice de acuerdo (Index of Agreement)
+
+<br>
+
+Las Figuras 3.3, 3.4, 3.5, y 3.6 muestran las rosas de viento y ciclos horarios de la dirección del viento medida y modelada en la estación Sierra Gorda. De ella se observa que el modelo de pronóstico meteorológico logra reproducir satisfactoriamente el ciclo diario y la tendencia de la dirección del viento.
+
+<div style="text-align: center;">
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+
+windRose(Met_Observados, key.position="right", auto.text = FALSE, paddle = FALSE, annotate = c("Promedio", "Calma"), key.header = "Wind Speed (m/s)",
+         key.footer = "")
+
+windRose(Met_Modelados, key.position="right", auto.text = FALSE, paddle = FALSE, annotate = c("Promedio", "Calma"), key.header = "Wind Speed (m/s)",
+         key.footer = "")
+
+```
+
+**Figura 3.3: Rosa de viento período total: Observada y Modelada en la estación Sierra Gorda**
+
+\newpage
+
+\hfill\break
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+
+MetObs_Diurno <- selectByDate(Met_Observados, hour = 08:20)
+MetMod_Diurno <- selectByDate(Met_Modelados, hour = 08:20)
+
+windRose(MetObs_Diurno, key.position="right", auto.text = FALSE, paddle = FALSE, annotate = c("Promedio", "Calma"), key.header = "Wind Speed (m/s)",
+         key.footer = "")
+
+windRose(MetMod_Diurno, key.position="right", auto.text = FALSE, paddle = FALSE, annotate = c("Promedio", "Calma"), key.header = "Wind Speed (m/s)",
+         key.footer = "")
+
+```
+
+**Figura 3.4: Rosa de viento período diurno: Observada y Modelada en la estación Sierra Gorda**
+
+\newpage
+
+\hfill\break
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+MetObs_Nocturno <- selectByDate(Met_Observados, hour = c(00:07, 21:23))
+MetMod_Nocturno <- selectByDate(Met_Modelados, hour = c(00:07, 21:23))
+
+windRose(MetObs_Nocturno, key.position="right", auto.text = FALSE, paddle = FALSE, annotate = c("Promedio", "Calma"), key.header = "Wind Speed (m/s)",
+         key.footer = "")
+
+windRose(MetMod_Nocturno, key.position="right", auto.text = FALSE, paddle = FALSE, annotate = c("Promedio", "Calma"), key.header = "Wind Speed (m/s)",
+         key.footer = "")
+```
+
+**Figura 3.5: Rosa de viento período nocturno: Observada y Modelada en la estación Sierra Gorda**
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE, results='hide'}
+
+rf <- colorRampPalette(rev(brewer.pal(11,'Spectral')))
+r <- rf(32)
+
+HoraYdireccion_Obs <-  Met_Observados %>% 
+  dplyr::select(Hora, wd)
+
+hist2d(HoraYdireccion_Obs, nbins = 24, col = r, xlab = "Horas del día", ylab = "Dirección del Viento")
+
+HoraYdireccion_Mod <-  Met_Modelados %>% 
+  dplyr::select(Hora, wd)
+
+hist2d(HoraYdireccion_Mod, nbins = 24, col = r, xlab = "Horas del día", ylab = "Dirección del Viento")
+
+```
+
+**Figura 3.6: Ciclo horario de la dirección del viento: Observado y Modelado en la estación Sierra Gorda**
+
+</div>
+
+<br>
+
+El análisis estadístico de la dirección del viento observada y medida en la estación Sierra Gorda se muestra en la Tabla III.3. De ella se observa que el modelo presenta un buen desempeño debido a que los estadisticos se encuentran dentro de los rangos aceptables.
+
+<br>
+
+<div class="centered-text">
+
+**Tabla III.3: Análisis estadístico de la dirección del viento en la estación Sierra Gorda**
+
+</div>
+
+<center>
+
+```{r, message = FALSE, echo = FALSE, warning=FALSE}
+
+Direccion <- inner_join(Met_Observados[c('date', 'wd')], Met_Modelados[c('date', 'wd')], by = "date")
+
+MFError = round(200 * mean(abs(Direccion$wd.y - Direccion$wd.x) / (Direccion$wd.y + Direccion$wd.x), na.rm = TRUE), 2)
+
+MFBias <- round(200 * mean((Direccion$wd.y - Direccion$wd.x) / (Direccion$wd.y + Direccion$wd.x), na.rm = TRUE), 2)
+
+df <- data.frame(MFE = MFError,
+                 `Criterio MFE` = "<+/- 70,0",
+                 MFB = MFBias,
+                 `Criterio MFB` = "<+/- 60,0")
+
+colnames(df) <- c("MFE", "Criterio MFE", "MFB", "Criterio MFB")
+
+pander(df, justify = "center")
+```
+
+</center>
+
+MFB: Sesgo fraccional  
+MFE: Error fraccional medio
+
+<br>
+
+### 3.2	EVALUACIÓN DEL PRONÓSTICO DE MP10
+
+La Figura 3.7 muestra el ciclo horario de las concentraciones de MP10 (µg/m3) medida y modelada en la estación Sierra Gorda para el `r Periodo`. A pesar de que el modelo logra captar el ciclo y tendencia de los niveles de MP10, los valores en la mayoría de las horas está sobreestimada.
+
+<br>
+
+<center>
+
+```{r, message = FALSE, echo = FALSE, warning = FALSE}
+
+MP10 <- inner_join(MeanMP10byHour_Observados, MeanMP10byHour_Modelados, by = "Hora")
+
+MP10_longer <- pivot_longer(MP10, cols = c("MP10_Obs", "MP10_Mod"))
+
+MP10_longer %>% 
+  ggplot(aes(x = Hora, y = value, color = name)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Hora del día", y = "MP10 (µg/m3N)") +
+  theme(legend.position = "top", legend.title = element_blank()) +
+  scale_color_discrete(labels = c("Modelado", "Observado")) +
+  scale_x_continuous(breaks = seq(0,23,1))
+
+```
+
+**Figura 3.7: Ciclo horario de las concentraciones de MP10 medida y modelada de la estación Sierra Gorda**
+
+</center>
+
+<br>
+
+El análisis estadístico de las concentraciones de MP10 observados y medidos en la estación Sierra Gorda se muestra en la tabla III.4. De ella se observa que el modelo presenta un buen desempeño debido a que los estadisticos se encuentran dentro de los rangos aceptables.
+
+<br>
+
+<center>
+
+**Tabla III.4: Análisis estadístico de MP10 en la estación Sierra Gorda**
+
+```{r, message = FALSE, echo = FALSE, warning=FALSE}
+
+MFError = round(200 * mean(abs(MP10$MP10_Mod - MP10$MP10_Obs) / (MP10$MP10_Mod + MP10$MP10_Obs), na.rm = TRUE), 2)
+
+MFBias <- round(200 * mean((MP10$MP10_Mod - MP10$MP10_Obs) / (MP10$MP10_Mod + MP10$MP10_Obs), na.rm = TRUE), 2)
+
+df <- data.frame(MFE = MFError,
+                 `Criterio MFE` = "<+/- 70,0",
+                 MFB = MFBias,
+                 `Criterio MFB` = "<+/- 60,0")
+
+colnames(df) <- c("MFE", "Criterio MFE", "MFB", "Criterio MFB")
+
+pander(df, justify = "center")
+```
+
+</center>
+
+MFB: Sesgo fraccional  
+MFE: Error fraccional medio
+
+<br>
+
+```{r, message = FALSE, echo = FALSE}
+ExactitudMP10 <- inner_join(MP10_Modelados[c('Fecha', 'MP10_Mod')], MP10_Observados[c('Fecha', 'MP10_Obs')], by = 'Fecha')
+
+ExactitudMP10 <- ExactitudMP10 %>% 
+  mutate(Bueno = case_when((between(MP10_Obs, 0, 130) & between(MP10_Mod, 0, 130)) | (!between(MP10_Obs, 0, 130) & (!between(MP10_Mod, 0, 130))) ~ 1,
+                           TRUE ~ 0),
+         Alerta1 = case_when((between(MP10_Obs, 130, 180) & between(MP10_Mod, 130, 180)) | (!between(MP10_Obs, 130, 180) & (!between(MP10_Mod, 130, 180))) ~ 1,
+                             TRUE ~ 0),
+         Alerta2 = case_when((MP10_Obs > 180 & MP10_Mod > 180) | (MP10_Obs < 180 & MP10_Mod < 180) ~ 1,
+                             TRUE ~ 0))
+
+pct_bueno = sum(ExactitudMP10$Bueno, na.rm = TRUE) / nrow(ExactitudMP10)
+pct_alerta1 = sum(ExactitudMP10$Alerta1, na.rm = TRUE) / nrow(ExactitudMP10)
+pct_alerta2 = sum(ExactitudMP10$Alerta2, na.rm = TRUE) / nrow(ExactitudMP10)
+promedio = mean(c(pct_bueno, pct_alerta1, pct_alerta2))
+```
+
+**3.2.1	Evaluación del pronóstico como herramienta de gestión**
+
+Para evaluar el desempeño del modelo de pronóstico de MP10, se dispone de la base de datos del periodo del `r Periodo`, de las concentraciones de MP10 medidas en la estación Sierra Gorda, las cuales se comparan con las concentraciones de MP10 pronosticadas por GEOMET para igual período.
+
+La evaluación se realiza por niveles de gestión, y se calcula la Exactitud del pronóstico para cada nivel.
+
+La Tabla III.5 muestra la Exactitud del modelo de pronóstico para el período evaluado en la estación de Sierra Gorda. De ella se observa que en promedio, el acierto del modelo es de un `r label_percent(1)(promedio)`, para el período del `r Periodo`.
+
+<center>
+
+<br>
+
+**Tabla III.5: Exactitud en la estimación del MP10**
+
+```{r, message = FALSE, echo = FALSE, warning=FALSE}
+
+
+df <- data.frame(Nivel = c("Bueno", "Alerta1", "Alerta2", "Promedio"),
+                 `Exactitud (%)` = c(label_percent(1)(pct_bueno),
+                                     label_percent(1)(pct_alerta1),
+                                     label_percent(1)(pct_alerta2),
+                                     label_percent(1)(promedio)))
+
+colnames(df) <- c("Bueno", "Exactitud (%)")
+emphasize.strong.cells(which(df == label_percent(1)(promedio) | df == "Promedio", arr.ind = TRUE))
+pander(df, justify = "center")
+```
+
+</center>
+
+## Conclusiones
+
+### Conclusiones
+
+Del análisis del desempeño del modelo de pronóstico meteorológico y de MP10, se concluye que éste presenta un buen ajuste al evaluar su acierto en términos gráficos y estadísticos.
+
+Para el MP10, el modelo logra un buen acierto en todos los niveles de gestión y además, logra reproducir el ciclo horario-diario, lo que asegura que si se toman las medidas de control en los horarios previos a los máximos, se puede reducir el impacto en receptores de interés.
+
+De esta forma, el buen desempeño del modelo de pronóstico, permiten concluir que esta herramienta desarrollada para Sierra Gorda, cumple con los requerimientos para realizar una adecuada gestión de riesgos por MP10.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
